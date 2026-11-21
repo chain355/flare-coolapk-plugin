@@ -1598,6 +1598,7 @@
   var DIAGNOSTIC_ACCOUNT_ID = "coolapk-diag";
   var CHECK_TICKS_BEFORE_HINT = 25;
   var checkTicks = 0;
+  var followFailures = 0;
   var CAPABILITIES = {
     "flare.datasource.timeline/v1": ["page"],
     // API v1 exposes search only when every declared operation is implemented.
@@ -1705,6 +1706,7 @@
       cookie: {
         async begin() {
           checkTicks = 0;
+          followFailures = 0;
           return { type: "webCookie", startUrl: LOGIN_URL };
         },
         async check(request, context) {
@@ -1751,11 +1753,18 @@
             uid = info.uid;
             sessionUser = { username: info.username, avatar: info.avatar };
           }
-          let users;
+          let users = [];
+          let followError = "";
           try {
             users = await importFollowing(credential, uid, cookiePairs);
-          } catch {
-            if (giveUp) return diagnosticSuccess(context, credential.deviceId, "\u5173\u6CE8\u5217\u8868\u8BFB\u4E0D\u5230");
+          } catch (error) {
+            followError = errorText(error);
+          }
+          if (followError) {
+            followFailures += 1;
+            if (giveUp || followFailures >= 2) {
+              return diagnosticSuccess(context, credential.deviceId, followError.slice(0, 28));
+            }
             return { type: "pending" };
           }
           if (!users.length) return diagnosticSuccess(context, credential.deviceId, "\u5173\u6CE8\u5217\u8868\u662F\u7A7A\u7684");
@@ -2046,12 +2055,7 @@
     const seen = /* @__PURE__ */ new Set();
     let lastItem;
     for (let page = 1; page <= IMPORT_PAGE_LIMIT; page++) {
-      const body = await apiGetWithCookies(
-        credential,
-        "/v6/user/followList",
-        { uid, page, lastItem },
-        cookiePairs
-      );
+      const body = await followListPage(credential, uid, page, lastItem, cookiePairs);
       const rows = asArray(body.data);
       if (!rows.length) break;
       const tail = rows[rows.length - 1];
@@ -2074,6 +2078,22 @@
     }
     return users;
   }
+  async function followListPage(credential, uid, page, lastItem, cookiePairs) {
+    const attempts = [
+      { uid, page, lastItem },
+      { uid, page }
+    ];
+    if (page === 1) attempts.push({ page });
+    let last = null;
+    for (const params of attempts) {
+      try {
+        return await apiGetWithCookies(credential, "/v6/user/followList", params, cookiePairs);
+      } catch (error) {
+        last = error;
+      }
+    }
+    throw last;
+  }
   async function apiGetWithCookies(credential, path, params, cookiePairs) {
     const query = Object.entries(params).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`).join("&");
     const url = `${API_ORIGIN}${path}?${query}`;
@@ -2088,9 +2108,12 @@
     } catch {
       fail("Network", "\u9177\u5B89\u63A5\u53E3\u8FDE\u63A5\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC");
     }
-    if (response.status === 403) fail("Unsupported", "\u9177\u5B89\u62D2\u7EDD\u4E86\u8BE5\u8BF7\u6C42\uFF0C\u65E0\u6CD5\u5BFC\u5165\u5173\u6CE8\u5217\u8868");
+    if (response.status === 403) {
+      const captcha = String(response.body ?? "").includes("captcha") ? "\u5173\u6CE8\u9700\u9A8C\u8BC1\u7801" : "\u5173\u6CE8\u88AB\u62D2403";
+      fail("Unsupported", captcha);
+    }
     if (response.status < 200 || response.status >= 300) {
-      fail("Remote", `\u9177\u5B89\u63A5\u53E3\u8FD4\u56DE ${response.status}\uFF0C\u65E0\u6CD5\u5BFC\u5165\u5173\u6CE8\u5217\u8868`);
+      fail("Remote", `\u5173\u6CE8\u63A5\u53E3${response.status}`);
     }
     try {
       return JSON.parse(response.body);
@@ -2276,6 +2299,17 @@
     } catch {
       return null;
     }
+  }
+  function errorText(error) {
+    const value = error;
+    const nested = value?.pluginError?.message?.value;
+    if (typeof nested === "string" && nested) return nested;
+    const message = value?.message;
+    if (typeof message === "string" && message) return message;
+    if (message && typeof message === "object" && typeof message.value === "string") {
+      return message.value;
+    }
+    return "\u5173\u6CE8\u5217\u8868\u8BFB\u53D6\u5931\u8D25";
   }
   function fail(code, message) {
     throw flare.error({ code, message: { value: message } });

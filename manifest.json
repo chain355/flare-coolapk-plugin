@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "apiVersion": 1,
   "id": "app.dimension.flare.plugin.coolapk",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "defaultLocale": "zh-Hans",
   "name": "酷安（只读）",
   "description": "匿名浏览酷安：本地关注流、用户主页、搜索。不发帖、不点赞、不带登录态。",
