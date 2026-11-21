@@ -1,0 +1,4 @@
+node_modules/
+*.fpp
+npm-debug.log*
+.DS_Store

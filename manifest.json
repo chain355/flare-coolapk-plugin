@@ -1,0 +1,160 @@
+{
+  "$schema": "https://unpkg.com/flare-plugin-sdk@next/skill/flare-plugin/manifest.schema.json",
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "app.dimension.flare.plugin.coolapk",
+  "version": "0.1.9",
+  "defaultLocale": "zh-Hans",
+  "name": "酷安（只读）",
+  "description": "匿名浏览酷安：本地关注流、用户主页、搜索。不发帖、不点赞、不带登录态。",
+  "permissions": {
+    "authOrigins": [
+      "https://account.coolapk.com",
+      "https://www.coolapk.com"
+    ],
+    "mediaNetwork": true
+  },
+  "platform": {
+    "id": "Coolapk",
+    "name": "酷安",
+    "description": "只读访问酷安",
+    "loginMethods": [
+      {
+        "id": "guest",
+        "interaction": "Form",
+        "title": "添加匿名酷安账号",
+        "description": "不登录，只读浏览；关注名单保存在本地。实例地址填 api.coolapk.com",
+        "fields": [
+          {
+            "id": "device",
+            "type": "Text",
+            "label": "设备标识（留空自动生成）",
+            "required": false
+          }
+        ]
+      },
+      {
+        "id": "cookie",
+        "interaction": "WebCookie",
+        "title": "登录一次并导入关注名单",
+        "description": "登录仅用于读取关注列表，导入完成后不再保留登录态",
+        "cookie": {
+          "startUrl": "https://account.coolapk.com/auth/login?type=mobile",
+          "probes": [
+            {
+              "url": "https://www.coolapk.com/",
+              "cookies": [
+                {
+                  "name": "uid",
+                  "required": false
+                },
+                {
+                  "name": "token",
+                  "required": false
+                },
+                {
+                  "name": "SESSID",
+                  "required": false
+                },
+                {
+                  "name": "username",
+                  "required": false
+                },
+                {
+                  "name": "validate",
+                  "required": false
+                }
+              ]
+            },
+            {
+              "url": "$accountOrigin/",
+              "cookies": [
+                {
+                  "name": "uid",
+                  "required": false
+                },
+                {
+                  "name": "token",
+                  "required": false
+                },
+                {
+                  "name": "SESSID",
+                  "required": false
+                },
+                {
+                  "name": "username",
+                  "required": false
+                },
+                {
+                  "name": "validate",
+                  "required": false
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "cookieImport",
+        "interaction": "CredentialImport",
+        "title": "粘贴 Cookie 导入关注",
+        "description": "从浏览器复制整段 Cookie 头，插件只读取身份后立即丢弃",
+        "fields": [
+          {
+            "id": "cookie",
+            "type": "Text",
+            "label": "Cookie（形如 uid=1; token=xx; SESSID=xx）",
+            "required": true
+          }
+        ]
+      }
+    ],
+    "capabilities": {
+      "flare.datasource.timeline/v1": {
+        "operations": {
+          "page": {
+            "directions": [
+              "refresh"
+            ]
+          }
+        }
+      },
+      "flare.datasource.search/v1": {
+        "operations": {
+          "posts": {},
+          "profiles": {},
+          "discoverPosts": {},
+          "discoverProfiles": {},
+          "discoverHashtags": {}
+        }
+      },
+      "flare.datasource.profile/v1": {
+        "operations": {
+          "byId": {},
+          "byHandle": {},
+          "timeline": {}
+        }
+      },
+      "flare.datasource.relation/v1": {
+        "operations": {
+          "state": {},
+          "mutate": {}
+        },
+        "relationActions": [
+          "follow"
+        ]
+      }
+    },
+    "timelines": [
+      {
+        "id": "follow",
+        "title": "本地关注",
+        "icon": "Local",
+        "defaultForNewAccount": true
+      }
+    ],
+    "detector": {
+      "priority": 0
+    }
+  }
+}
